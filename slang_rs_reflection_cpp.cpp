@@ -61,11 +61,19 @@ static const char *GetMatrixTypeName(const RSExportMatrixType *EMT) {
 }
 
 
-static std::string GetTypeName(const RSExportType *ET, bool Brackets = true) {
+static std::string GetTypeName(const RSExportType *ET, bool Brackets = true, bool PreIdentifier = true) {
+    if((!PreIdentifier) && (ET->getClass() != RSExportType::ExportClassConstantArray))
+    {
+        return "";
+    }
   switch (ET->getClass()) {
     case RSExportType::ExportClassPrimitive: {
-      return RSExportPrimitiveType::getRSReflectionType(
+      std::string ClassName = RSExportPrimitiveType::getRSReflectionType(
           static_cast<const RSExportPrimitiveType*>(ET))->c_name;
+      if(ClassName == "Allocation")
+          return "android::sp<android::RSC::Allocation>";
+      else
+        return ClassName;
     }
     case RSExportType::ExportClassPointer: {
       const RSExportType *PointeeType =
@@ -88,14 +96,21 @@ static std::string GetTypeName(const RSExportType *ET, bool Brackets = true) {
       return GetMatrixTypeName(static_cast<const RSExportMatrixType*>(ET));
     }
     case RSExportType::ExportClassConstantArray: {
-      // TODO: Fix this for C arrays!
-      const RSExportConstantArrayType* CAT =
-          static_cast<const RSExportConstantArrayType*>(ET);
-      std::string ElementTypeName = GetTypeName(CAT->getElementType());
-      if (Brackets) {
-        ElementTypeName.append("[]");
-      }
-      return ElementTypeName;
+        // TODO: Fix this for C arrays! [temporarily FIXED]
+        const RSExportConstantArrayType* CAT =
+                static_cast<const RSExportConstantArrayType*>(ET);
+        if(PreIdentifier) {
+            std::string ElementTypeName = GetTypeName(CAT->getElementType());
+            if (Brackets & !PreIdentifier) {
+                ElementTypeName.append("[]");
+            }
+            return ElementTypeName;
+        }
+        else {
+            std::stringstream ArraySpec;
+            ArraySpec << "[" << CAT->getSize() << "]";
+            return ArraySpec.str();
+        }
     }
     case RSExportType::ExportClassRecord: {
       // TODO: Fix for C structs!
@@ -184,7 +199,7 @@ bool RSReflectionCpp::makeHeader(const std::string &baseClass) {
     const RSExportVar *ev = *I;
     if (!ev->isConst()) {
       write(GetTypeName(ev->getType()) + " " RS_EXPORT_VAR_PREFIX
-            + ev->getName() + ";");
+            + ev->getName() + GetTypeName(ev->getType(), true, false) + ";");
     }
   }
 
@@ -519,15 +534,15 @@ void RSReflectionCpp::genPrimitiveTypeExportVariable(const RSExportVar *EV) {
   EV->getType()->convertToRTD(&rtd);
 
   if (!EV->isConst()) {
-    write(string("void set_") + EV->getName() + "(" + rtd.type->c_name +
+    write(string("void set_") + EV->getName() + "(" + GetTypeName(EV->getType()) + //rtd.type->c_name +
           " v) {");
     stringstream tmp;
     tmp << getNextExportVarSlot();
-    write(string("    setVar(") + tmp.str() + ", &v, sizeof(v));");
+    write(string("    setVar(") + tmp.str() + ", v);"); // ", &v, sizeof(v));");
     write(string("    " RS_EXPORT_VAR_PREFIX) + EV->getName() + " = v;");
     write("}");
   }
-  write(string(rtd.type->c_name) + " get_" + EV->getName() + "() const {");
+  write(string(GetTypeName(EV->getType())) + " get_" + EV->getName() + "() const {");
   if (EV->isConst()) {
     const clang::APValue &val = EV->getInit();
     bool isBool = !strcmp(rtd.type->c_name, "bool");
@@ -613,12 +628,61 @@ void RSReflectionCpp::genVectorTypeExportVariable(const RSExportVar *EV) {
 }
 
 void RSReflectionCpp::genMatrixTypeExportVariable(const RSExportVar *EV) {
-  slangAssert(false);
+    uint32_t slot = getNextExportVarSlot();
+    stringstream tmp;
+    tmp << slot;
+
+	const RSExportType *ET = EV->getType();
+	if(ET->getName() == "rs_matrix4x4")
+	{
+		write(string("void set_") + EV->getName() + "(float " +
+                "v[16]) {");
+		write(string("    setVar(") + tmp.str() + string(", v, sizeof(float)*16);"));
+		write("}");
+	}
+	else
+	if (ET->getName() == "rs_matrix3x3")
+	{
+		write(string("void set_") + EV->getName() + "(float " +
+                "v[9]) {");
+		write(string("    setVar(") + tmp.str() + string(", v, sizeof(float)*9);"));
+		write("}");
+	}
+	else
+	if(ET->getName() == "rs_matrix2x2")
+	{
+		write(string("void set_") + EV->getName() + "(float " +
+                "v[4]) {");
+		write(string("    setVar(") + tmp.str() + string(", v, sizeof(float)*4);"));
+		write("}");
+	}
+	else
+	{
+		write(string("#error: [IMG]TODO: ") + ET->getName());
+		slangAssert(false);
+	}
+
+
 }
 
 void RSReflectionCpp::genConstantArrayTypeExportVariable(
     const RSExportVar *EV) {
-  slangAssert(false);
+    std::stringstream ArraySpec;
+    const RSExportType *ET = EV->getType();
+
+    const RSExportConstantArrayType* CAT =
+                static_cast<const RSExportConstantArrayType*>(ET);
+
+    uint32_t slot = getNextExportVarSlot();
+    stringstream tmp;
+    tmp << slot;
+
+
+    ArraySpec << CAT->getSize();
+    write(string("void set_") + EV->getName() + "(" + GetTypeName(EV->getType()) + //rtd.type->c_name +
+          " v " + GetTypeName(EV->getType(), true, false) + ") {");
+    write(string("    setVar(") + tmp.str() + string(", v, sizeof(") + GetTypeName(EV->getType()) + string(") *") + ArraySpec.str() + string(");"));
+    write("}");
 }
 
 void RSReflectionCpp::genRecordTypeExportVariable(const RSExportVar *EV) {
