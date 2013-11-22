@@ -61,9 +61,9 @@ static RSReflectionType gReflectionTypes[] = {
     {"UNSIGNED_5_5_5_1", NULL, 16, NULL, NULL, NULL, NULL, false},
     {"UNSIGNED_4_4_4_4", NULL, 16, NULL, NULL, NULL, NULL, false},
 
-    {"MATRIX_2X2", NULL, 4*32, "rs_matrix2x2", "Matrix2f", NULL, NULL, false},
-    {"MATRIX_3X3", NULL, 9*32, "rs_matrix3x3", "Matrix3f", NULL, NULL, false},
-    {"MATRIX_4X4", NULL, 16*32, "rs_matrix4x4", "Matrix4f", NULL, NULL, false},
+    {"MATRIX_2X2", NULL, 4*32, "rsMatrix_2x2", "Matrix2f", NULL, NULL, false},
+    {"MATRIX_3X3", NULL, 9*32, "rsMatrix_3x3", "Matrix3f", NULL, NULL, false},
+    {"MATRIX_4X4", NULL, 16*32, "rsMatrix_4x4", "Matrix4f", NULL, NULL, false},
 
     {"RS_ELEMENT", "ELEMENT", 32, "Element", "Element", NULL, NULL, false},
     {"RS_TYPE", "TYPE", 32, "Type", "Type", NULL, NULL, false},
