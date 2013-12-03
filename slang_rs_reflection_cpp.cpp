@@ -361,7 +361,9 @@ bool RSReflectionCpp::makeImpl(const std::string &baseClass) {
        I++) {
     const RSExportVar *EV = *I;
     if (!EV->getInit().isUninit()) {
-      genInitExportVariable(EV->getType(), EV->getName(), EV->getInit());
+      if (!EV->isConst()) {
+        genInitExportVariable(EV->getType(), EV->getName(), EV->getInit());
+      }
     } else {
       genZeroInitExportVariable(EV->getName());
     }
@@ -530,14 +532,14 @@ void RSReflectionCpp::genExportVariable(const RSExportVar *EV) {
 
 
 void RSReflectionCpp::genPrimitiveTypeExportVariable(const RSExportVar *EV) {
+  stringstream tmp;
+  tmp << getNextExportVarSlot();
   RSReflectionTypeData rtd;
   EV->getType()->convertToRTD(&rtd);
 
   if (!EV->isConst()) {
     write(string("void set_") + EV->getName() + "(" + GetTypeName(EV->getType()) + //rtd.type->c_name +
           " v) {");
-    stringstream tmp;
-    tmp << getNextExportVarSlot();
     write(string("    setVar(") + tmp.str() + ", v);"); // ", &v, sizeof(v));");
     write(string("    " RS_EXPORT_VAR_PREFIX) + EV->getName() + " = v;");
     write("}");
